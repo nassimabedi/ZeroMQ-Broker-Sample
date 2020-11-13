@@ -5,15 +5,25 @@
 package main
 
 import (
-	zmq "github.com/pebbe/zmq4"
-	"math/rand"
-
 	"fmt"
+	zmq "github.com/pebbe/zmq4"
+	"log"
+	"math/rand"
+	"strconv"
+	"sync"
+
 	//"math/rand"
+
 	"time"
 )
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const (
+	letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	//ir := IntRange{50,8000}
+	MinMessageSize = 50
+	MaxMessageSize = 100
+	SendRate       = 10000
+)
 
 func randStringBytes(n int) string {
 	b := make([]byte, n)
@@ -33,47 +43,64 @@ func (ir *IntRange) NextRandom(r *rand.Rand) int {
 	return r.Intn(ir.max-ir.min+1) + ir.min
 }
 
-func client_task() {
-
-	//a:= zmq.SetMaxMsgsz(100)
+func clientTask(wg *sync.WaitGroup) {
+	time.Sleep(1 * time.Second)
 	client, _ := zmq.NewSocket(zmq.REQ)
 	defer client.Close()
-	// set_id(client) //  Set a printable identity
 	client.Connect("ipc://frontend.ipc")
-
 	//  Send request, get reply
-	//Nassim set RATE ZMQ_RATE
-	client.SetRate(1000)
-	//client.SetMaxmsgsize(100)
-	client.SetSndbuf(80)
+	//  set RATE ZMQ_RATE
+	client.SetRate(SendRate)
+	client.SetMaxmsgsize(MaxMessageSize)
 
 	start := time.Now()
-	requests := 10000
+	requests := SendRate
 	r := rand.New(rand.NewSource(55))
-	//ir := IntRange{50,8000}
-	ir := IntRange{50, 100}
+	ir := IntRange{MinMessageSize, MaxMessageSize}
+	realInt := 0
 	for i := 0; i < requests; i++ {
 		str := randStringBytes(ir.NextRandom(r))
-		//client.Send("HELLO1111111111",0)
-		client.Send(str, 0)
-		//client.SendMessage(i,str)
-
-		//client.Send([]byte("hello"), 0)
-
+		client.Send(str, zmq.SNDMORE)
+		client.Send(strconv.Itoa(i), 0)
 		client.Recv(0)
+		fmt.Println(realInt)
 	}
+
 	fmt.Printf("%d calls/second\n", int64(float64(requests)/time.Since(start).Seconds()))
+
+	value, err := GetValue("real")
+	if err != nil {
+		log.Println(err)
+	}
+	if value == "" {
+		realInt = 0
+	}
+
+	if value != "" {
+		realInt, err = strconv.Atoi(value)
+		if err != nil {
+			log.Println("There is an Error: ", err)
+
+		} else {
+			realInt = realInt + requests
+		}
+
+	} else {
+		realInt = realInt + requests
+	}
+
+	err = SetValue("real", realInt)
+	fmt.Println(err)
+	wg.Done()
+
 }
 
-//  This is the main task. It starts the clients and workers, and then
-//  routes requests between the two layers. Workers signal READY when
-//  they start; after that we treat them as ready when they reply with
-//  a response back to a client. The load-balancing data structure is
-//  just a queue of next available workers.
-
 func main() {
-
-	go client_task()
-	time.Sleep(100 * time.Millisecond)
-
+	var wg sync.WaitGroup
+	for true {
+		wg.Add(1)
+		go clientTask(&wg)
+		time.Sleep(1000 * time.Millisecond)
+	}
+	wg.Wait()
 }
