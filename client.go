@@ -57,16 +57,7 @@ func clientTask(wg *sync.WaitGroup) {
 	requests := SendRate
 	r := rand.New(rand.NewSource(55))
 	ir := IntRange{MinMessageSize, MaxMessageSize}
-	realInt := 0
-	for i := 0; i < requests; i++ {
-		str := randStringBytes(ir.NextRandom(r))
-		client.Send(str, zmq.SNDMORE)
-		client.Send(strconv.Itoa(i), 0)
-		client.Recv(0)
-		fmt.Println(realInt)
-	}
-
-	fmt.Printf("%d calls/second\n", int64(float64(requests)/time.Since(start).Seconds()))
+	var realInt int
 
 	value, err := GetValue("real")
 	if err != nil {
@@ -81,13 +72,19 @@ func clientTask(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Println("There is an Error: ", err)
 
-		} else {
-			realInt = realInt + requests
 		}
-
-	} else {
-		realInt = realInt + requests
 	}
+
+	for i := 0; i < requests; i++ {
+		str := randStringBytes(ir.NextRandom(r))
+		client.Send(str, zmq.SNDMORE)
+		realInt = realInt + requests
+		client.Send(strconv.Itoa(realInt), 0)
+		client.Recv(0)
+		log.Println(realInt)
+	}
+
+	log.Printf("%d calls/second\n", int64(float64(requests)/time.Since(start).Seconds()))
 
 	err = SetValue("real", realInt)
 	fmt.Println(err)

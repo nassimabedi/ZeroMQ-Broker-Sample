@@ -7,7 +7,8 @@ package main
 import (
 	"fmt"
 	zmq "github.com/pebbe/zmq4"
-	//"math/rand"
+	"log"
+	"strconv"
 	"time"
 )
 
@@ -19,7 +20,24 @@ func workerTask() {
 	//  Tell broker we're ready for work
 	worker.Send("READY", 0)
 
-	receivedInt := 0
+	//receivedInt := 0
+	var receivedInt int
+	value, err := GetValue("received")
+	if err != nil {
+		log.Println(err)
+	}
+	if value == "" {
+		receivedInt = 0
+	}
+
+	if value != "" {
+		receivedInt, err = strconv.Atoi(value)
+		if err != nil {
+			log.Println("There is an Error: ", err)
+
+		}
+	}
+
 	for {
 		//  Read and save all frames until we get an empty frame
 		//  In this example there is only 1 but it could be more
@@ -34,12 +52,16 @@ func workerTask() {
 
 		id, _ := worker.Recv(0)
 
-		fmt.Println("Worker:", request)
+		log.Println("Worker:", request)
 
 		receivedInt = receivedInt + 1
 
-		fmt.Println("real id :", id)
-		fmt.Println("received id :", receivedInt)
+		//save received id to redis
+		err = SetValue("received", receivedInt)
+		log.Println(err)
+
+		log.Println("real id :", id)
+		log.Println("received id :", receivedInt)
 
 		worker.Send(identity, zmq.SNDMORE)
 		worker.Send("", zmq.SNDMORE)
