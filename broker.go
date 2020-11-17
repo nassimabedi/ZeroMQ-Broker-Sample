@@ -21,16 +21,6 @@ const (
 // write message to file if file size bigger than MaxFileSize Older file rename
 func writeFile(content string) {
 	filename := Filename
-	info, err := os.Stat(filename)
-	fileSize := info.Size()
-	//  if filesize mare than MaxFileSize the file rename
-	if fileSize > MaxFileSize {
-		newName := filename + "_" + time.Now().String()
-		err = os.Rename(filename, newName)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -42,6 +32,18 @@ func writeFile(content string) {
 	if err := f.Close(); err != nil {
 		log.Fatal(err)
 	}
+
+	info, err := os.Stat(filename)
+	fileSize := info.Size()
+	//  if filesize mare than MaxFileSize the file rename
+	if fileSize > MaxFileSize {
+		newName := filename + "_" + time.Now().String()
+		err = os.Rename(filename, newName)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 }
 
 func main() {
