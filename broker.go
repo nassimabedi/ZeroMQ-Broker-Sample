@@ -9,6 +9,7 @@ import (
 	zmq "github.com/pebbe/zmq4"
 	"log"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -18,7 +19,9 @@ const (
 )
 
 // write message to file if file size bigger than MaxFileSize Older file rename
-func writeFile(content string) {
+func writeFile(content string, m *sync.Mutex) {
+	m.Lock()
+	defer m.Unlock()
 	filename := LogFilename
 
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -107,23 +110,17 @@ func main() {
 				}
 
 				request, _ := frontend.Recv(0)
-				//frameID, _ := frontend.Recv(0)
-				//if i, err := strconv.Atoi(frameID); err == nil {
-				//	log.Println("======>", i)
-				//} else {
-				//	log.Println("There is an Error to convert type: ", err)
-				//}
 
 				fmt.Println("broker:", clientId, request)
 				//  write message to file
-				go writeFile(request)
+				var m sync.Mutex
+				go writeFile(request, &m)
 
 				backend.Send(workerQueue[0], zmq.SNDMORE)
 				backend.Send("", zmq.SNDMORE)
 				backend.Send(clientId, zmq.SNDMORE)
 				backend.Send("", zmq.SNDMORE)
 				backend.Send(request, 0)
-				//backend.Send(frameID, 0)
 
 				//  Dequeue and drop the next worker identity
 				workerQueue = workerQueue[1:]
