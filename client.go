@@ -1,19 +1,14 @@
 //
-//  Clients
+//  Client : generate package and send to broker
 //
 
 package main
 
 import (
-	"fmt"
 	zmq "github.com/pebbe/zmq4"
 	"log"
 	"math/rand"
-	"strconv"
 	"sync"
-
-	//"math/rand"
-
 	"time"
 )
 
@@ -43,7 +38,7 @@ func (ir *IntRange) NextRandom(r *rand.Rand) int {
 	return r.Intn(ir.max-ir.min+1) + ir.min
 }
 
-func clientTask(wg *sync.WaitGroup) {
+func clientTask(wg *sync.WaitGroup, m *sync.Mutex) {
 	time.Sleep(1 * time.Second)
 	client, _ := zmq.NewSocket(zmq.REQ)
 	defer client.Close()
@@ -57,46 +52,32 @@ func clientTask(wg *sync.WaitGroup) {
 	requests := SendRate
 	r := rand.New(rand.NewSource(55))
 	ir := IntRange{MinMessageSize, MaxMessageSize}
-	var realInt int
-
-	value, err := GetValue("real")
-	if err != nil {
-		log.Println(err)
-	}
-	if value == "" {
-		realInt = 0
-	}
-
-	if value != "" {
-		realInt, err = strconv.Atoi(value)
-		if err != nil {
-			log.Println("There is an Error: ", err)
-
-		}
-	}
 
 	for i := 0; i < requests; i++ {
 		str := randStringBytes(ir.NextRandom(r))
-		client.Send(str, zmq.SNDMORE)
-		realInt = realInt + requests
-		client.Send(strconv.Itoa(realInt), 0)
+		client.Send(str, 0)
+
+		result, err := readAndWrite(RealFilename, m)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		client.Recv(0)
-		log.Println(realInt)
+		log.Println("package number: ", result)
+
 	}
 
 	log.Printf("%d calls/second\n", int64(float64(requests)/time.Since(start).Seconds()))
-
-	err = SetValue("real", realInt)
-	fmt.Println(err)
 	wg.Done()
 
 }
 
 func main() {
 	var wg sync.WaitGroup
+	var m sync.Mutex
 	for true {
 		wg.Add(1)
-		go clientTask(&wg)
+		go clientTask(&wg, &m)
 		time.Sleep(1000 * time.Millisecond)
 	}
 	wg.Wait()

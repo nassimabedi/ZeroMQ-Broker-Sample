@@ -1,5 +1,5 @@
 //
-// broker.
+// broker: received package from client and send to worker
 //
 
 package main
@@ -9,18 +9,17 @@ import (
 	zmq "github.com/pebbe/zmq4"
 	"log"
 	"os"
-	"strconv"
 	"time"
 )
 
 const (
-	Filename    = "access.log" // name of the file to write file
+	LogFilename = "access.log" // name of the file to write file
 	MaxFileSize = 1000000      //mac file size to write to another file
 )
 
 // write message to file if file size bigger than MaxFileSize Older file rename
 func writeFile(content string) {
-	filename := Filename
+	filename := LogFilename
 
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -108,12 +107,12 @@ func main() {
 				}
 
 				request, _ := frontend.Recv(0)
-				frameID, _ := frontend.Recv(0)
-				if i, err := strconv.Atoi(frameID); err == nil {
-					log.Println("======>", i)
-				} else {
-					log.Println("There is an Error to convert type: ", err)
-				}
+				//frameID, _ := frontend.Recv(0)
+				//if i, err := strconv.Atoi(frameID); err == nil {
+				//	log.Println("======>", i)
+				//} else {
+				//	log.Println("There is an Error to convert type: ", err)
+				//}
 
 				fmt.Println("broker:", clientId, request)
 				//  write message to file
@@ -123,8 +122,8 @@ func main() {
 				backend.Send("", zmq.SNDMORE)
 				backend.Send(clientId, zmq.SNDMORE)
 				backend.Send("", zmq.SNDMORE)
-				backend.Send(request, zmq.SNDMORE)
-				backend.Send(frameID, 0)
+				backend.Send(request, 0)
+				//backend.Send(frameID, 0)
 
 				//  Dequeue and drop the next worker identity
 				workerQueue = workerQueue[1:]
